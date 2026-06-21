@@ -1,6 +1,5 @@
 using System.Drawing;
 using System.Windows.Forms;
-using System.Windows.Forms.DataVisualization.Charting;
 using FitTracker.Models;
 using FitTracker.Services;
 
@@ -30,7 +29,8 @@ namespace FitTracker
         private Button _btnLanguage;
         private DataGridView _dataGridView;
         private Panel _panelChart;
-        private Chart _chart;
+        private Panel _panelFilter;
+        private ChartControl _chartControl;
         private Label _lblStats;
         private ComboBox _cmbExerciseFilter;
 
@@ -56,58 +56,117 @@ namespace FitTracker
         private void InitializeComponent()
         {
             this.Text = "Fit Tracker 💪 - Тренировки";
-            this.Size = new Size(1000, 700);
+            this.Size = new Size(1100, 750);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.MinimumSize = new Size(800, 600);
+            this.MinimumSize = new Size(900, 650);
 
             // ========== ПАНЕЛЬ ВВОДА (ВЕРХ) ==========
             _panelInput = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 70,
-                Padding = new Padding(10)
+                Height = 90,
+                Padding = new Padding(12),
+                AutoSize = false
             };
 
-            int yPos = 10;
-            int labelWidth = 70;
-            int fieldWidth = 100;
-            int gap = 5;
+            // Делаем верстку стабильной: TableLayoutPanel убирает слипание контролов
+            var table = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 8,
+                RowCount = 2,
+                Margin = new Padding(0),
+                Padding = new Padding(0),
+                AutoSize = false
+            };
+
+            // Колонки
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));  // label: Дата
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145)); // txtDate
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));      // Упражнение label/txt
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); // txtWeight
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); // txtReps
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); // txtSets
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); // btnAdd
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); // btnDelete/Theme stack
+
+            // Ряды: 0 - labels, 1 - inputs/buttons
+            table.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+            table.RowStyles.Add(new RowStyle(SizeType.Absolute, 45));
+
+            int labelFontSize = 9;
+
+            // Helpers
+            Label MakeLabel(string text)
+            {
+                return new Label
+                {
+                    Text = text,
+                    Dock = DockStyle.Fill,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    AutoSize = false,
+                    Font = new Font("Segoe UI", labelFontSize, FontStyle.Regular),
+                    Padding = new Padding(0, 0, 6, 0)
+                };
+            }
+
+            TextBox MakeTextBox(string placeholder)
+            {
+                return new TextBox
+                {
+                    Dock = DockStyle.Fill,
+                    Margin = new Padding(4, 2, 4, 2),
+                    PlaceholderText = placeholder,
+                    Font = new Font("Segoe UI", 10, FontStyle.Regular)
+                };
+            }
 
             // Дата
-            var lblDate = new Label { Text = "Дата:", Location = new Point(10, yPos + 3), Width = labelWidth };
-            _txtDate = new TextBox { Location = new Point(10 + labelWidth, yPos), Width = fieldWidth };
+            var lblDate = MakeLabel("Дата:");
+            _txtDate = MakeTextBox("");
             _txtDate.Text = DateTime.Now.ToString("yyyy-MM-dd");
 
+            table.Controls.Add(lblDate, 0, 0);
+            table.Controls.Add(_txtDate, 1, 1);
+
             // Название упражнения
-            var lblName = new Label { Text = "Упражнение:", Location = new Point(130 + labelWidth, yPos + 3), Width = 80 };
-            _txtExerciseName = new TextBox { Location = new Point(130 + labelWidth + 80, yPos), Width = 150 };
-            _txtExerciseName.PlaceholderText = "Например: Жим лежа";
+            var lblName = MakeLabel("Упражнение:");
+            _txtExerciseName = MakeTextBox("Например: Жим лежа");
+
+            // В 2 колонки: use column 2 width (percent) so label fits
+            table.SetColumnSpan(lblName, 1);
+            table.Controls.Add(lblName, 2, 0);
+            table.Controls.Add(_txtExerciseName, 2, 1);
 
             // Вес
-            var lblWeight = new Label { Text = "Вес (кг):", Location = new Point(400, yPos + 3), Width = labelWidth };
-            _txtWeight = new TextBox { Location = new Point(400 + labelWidth, yPos), Width = fieldWidth };
-            _txtWeight.PlaceholderText = "0";
+            var lblWeight = MakeLabel("Вес (кг):");
+            _txtWeight = MakeTextBox("0");
+            table.Controls.Add(lblWeight, 3, 0);
+            table.Controls.Add(_txtWeight, 3, 1);
 
             // Повторения
-            var lblReps = new Label { Text = "Повторения:", Location = new Point(530, yPos + 3), Width = 80 };
-            _txtReps = new TextBox { Location = new Point(530 + 80, yPos), Width = fieldWidth };
-            _txtReps.PlaceholderText = "0";
+            var lblReps = MakeLabel("Повторения:");
+            _txtReps = MakeTextBox("0");
+            table.Controls.Add(lblReps, 4, 0);
+            table.Controls.Add(_txtReps, 4, 1);
 
             // Подходы
-            var lblSets = new Label { Text = "Подходы:", Location = new Point(660, yPos + 3), Width = 70 };
-            _txtSets = new TextBox { Location = new Point(660 + 70, yPos), Width = fieldWidth };
-            _txtSets.PlaceholderText = "0";
+            var lblSets = MakeLabel("Подходы:");
+            _txtSets = MakeTextBox("0");
+            table.Controls.Add(lblSets, 5, 0);
+            table.Controls.Add(_txtSets, 5, 1);
 
-            // Кнопки
+            // Кнопки: добавление/удаление
             _btnAdd = new Button
             {
                 Text = _langAdd,
-                Location = new Point(800, yPos),
-                Width = 90,
-                Height = 25,
+                Dock = DockStyle.Fill,
+                Height = 40,
                 BackColor = Color.FromArgb(76, 175, 80),
                 ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Margin = new Padding(6, 2, 6, 2)
             };
             _btnAdd.FlatAppearance.BorderSize = 0;
             _btnAdd.Click += BtnAdd_Click;
@@ -115,40 +174,57 @@ namespace FitTracker
             _btnDelete = new Button
             {
                 Text = _langDelete,
-                Location = new Point(800, yPos + 30),
-                Width = 90,
-                Height = 25,
+                Dock = DockStyle.Fill,
+                Height = 40,
                 BackColor = Color.FromArgb(244, 67, 54),
                 ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                Margin = new Padding(6, 2, 6, 2)
             };
             _btnDelete.FlatAppearance.BorderSize = 0;
             _btnDelete.Click += BtnDelete_Click;
 
+            // Theme/Language остаются справа, но вынесем их в верхнюю строку второй группы
             _btnTheme = new Button
             {
                 Text = _langTheme,
-                Location = new Point(900, yPos),
-                Width = 80,
-                Height = 25
+                Dock = DockStyle.Fill,
+                Height = 22,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Regular),
+                Margin = new Padding(6, 4, 6, 2)
             };
             _btnTheme.Click += BtnTheme_Click;
 
             _btnLanguage = new Button
             {
                 Text = _langLanguage,
-                Location = new Point(900, yPos + 30),
-                Width = 80,
-                Height = 25
+                Dock = DockStyle.Fill,
+                Height = 22,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Regular),
+                Margin = new Padding(6, 2, 6, 4)
             };
             _btnLanguage.Click += BtnLanguage_Click;
 
-            _panelInput.Controls.AddRange(new Control[]
-            {
-                lblDate, _txtDate, lblName, _txtExerciseName,
-                lblWeight, _txtWeight, lblReps, _txtReps, lblSets, _txtSets,
-                _btnAdd, _btnDelete, _btnTheme, _btnLanguage
-            });
+            // Вставляем кнопки Add/Delete в колонки 6 и 7
+            table.Controls.Add(_btnAdd, 6, 1);
+            table.Controls.Add(_btnDelete, 7, 1);
+
+            // В колонке 7 разместим theme/language в строках 0/1, чтобы не мешали add/delete
+            // (labels уже заняты, поэтому делаем вложенный panel)
+            var rightTopPanel = new Panel { Dock = DockStyle.Fill };
+            rightTopPanel.Controls.Add(_btnTheme);
+            rightTopPanel.Controls.Add(_btnLanguage);
+
+            _btnTheme.Dock = DockStyle.Top;
+            _btnLanguage.Dock = DockStyle.Bottom;
+
+            table.SetColumnSpan(rightTopPanel, 1);
+            table.Controls.Add(rightTopPanel, 7, 0);
+
+            _panelInput.Controls.Add(table);
 
             // ========== ТАБЛИЦА ДАННЫХ (ЦЕНТР) ==========
             _dataGridView = new DataGridView
@@ -175,20 +251,46 @@ namespace FitTracker
                 Padding = new Padding(10)
             };
 
+            // Фильтр сверху, чтобы не мешал графику
+            _panelFilter = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 44,
+                Padding = new Padding(10, 8, 10, 6)
+            };
+
+            var filterTable = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Margin = new Padding(0),
+                Padding = new Padding(0),
+                AutoSize = false
+            };
+            filterTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210));
+            filterTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
             _cmbExerciseFilter = new ComboBox
             {
-                Location = new Point(10, 10),
-                Width = 200,
-                DropDownStyle = ComboBoxStyle.DropDownList
+                Dock = DockStyle.Fill,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                MaxDropDownItems = 10
             };
             _cmbExerciseFilter.SelectedIndexChanged += CmbExerciseFilter_SelectedIndexChanged;
 
             var lblFilter = new Label
             {
                 Text = "Фильтр по упражнению:",
-                Location = new Point(10, -5),
-                AutoSize = true
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoSize = false
             };
+
+            filterTable.Controls.Add(lblFilter, 0, 0);
+            filterTable.Controls.Add(_cmbExerciseFilter, 1, 0);
+
+            _panelFilter.Controls.Add(filterTable);
 
             _lblStats = new Label
             {
@@ -199,29 +301,13 @@ namespace FitTracker
                 Padding = new Padding(10, 10, 0, 0)
             };
 
-            _chart = new Chart
+            _chartControl = new ChartControl
             {
-                Dock = DockStyle.Fill,
-                BackColor = Color.White
+                Dock = DockStyle.Fill
             };
-            var chartArea = new ChartArea("MainArea");
-            chartArea.AxisX.Title = "№ тренировки";
-            chartArea.AxisY.Title = "Вес (кг)";
-            _chart.ChartAreas.Add(chartArea);
 
-            var series = new Series("WeightProgress")
-            {
-                ChartType = SeriesChartType.Line,
-                MarkerStyle = MarkerStyle.Circle,
-                MarkerSize = 8,
-                Color = Color.FromArgb(33, 150, 243),
-                BorderWidth = 2
-            };
-            _chart.Series.Add(series);
-
-            _panelChart.Controls.Add(_chart);
-            _panelChart.Controls.Add(_cmbExerciseFilter);
-            _panelChart.Controls.Add(lblFilter);
+            _panelChart.Controls.Add(_chartControl);
+            _panelChart.Controls.Add(_panelFilter);
             _panelChart.Controls.Add(_lblStats);
 
             // ========== ДОБАВЛЕНИЕ НА ФОРМУ ==========
@@ -273,8 +359,6 @@ namespace FitTracker
 
         private void UpdateChart()
         {
-            _chart.Series[0].Points.Clear();
-
             var analysis = _analysisService.Analyze(_workouts);
             _lblStats.Text = $"📊 Тренировок: {analysis.TotalWorkouts} | " +
                             $"🏋️ Средний вес: {analysis.AverageWeight:F1} кг | " +
@@ -282,15 +366,18 @@ namespace FitTracker
                             $"💪 Мин: {analysis.MinWeight} кг | " +
                             $"📈 Объем: {analysis.TotalVolume:N0} кг";
 
-            int index = 1;
+            // Прогресс по всем упражнениям (как сейчас в AnalysisService)
+            var data = new List<(string date, int weight)>();
             foreach (var workout in _workouts)
             {
                 foreach (var exercise in workout.Exercises)
                 {
-                    _chart.Series[0].Points.AddXY(index, exercise.Weight);
-                    index++;
+                    data.Add((workout.Date, exercise.Weight));
                 }
             }
+
+            _chartControl.Title = "Прогресс веса";
+            _chartControl.Data = data;
         }
 
         private void UpdateExerciseFilter()
@@ -455,15 +542,10 @@ namespace FitTracker
             _dataGridView.ColumnHeadersDefaultCellStyle.BackColor = panelColor;
             _dataGridView.ColumnHeadersDefaultCellStyle.ForeColor = textColor;
 
-            _chart.BackColor = panelColor;
-            _chart.ChartAreas[0].BackColor = panelColor;
-            _chart.ChartAreas[0].AxisX.LabelStyle.ForeColor = textColor;
-            _chart.ChartAreas[0].AxisY.LabelStyle.ForeColor = textColor;
-            _chart.ChartAreas[0].AxisX.TitleForeColor = textColor;
-            _chart.ChartAreas[0].AxisY.TitleForeColor = textColor;
-
             _lblStats.BackColor = isDark ? Color.FromArgb(60, 60, 60) : Color.FromArgb(230, 230, 230);
             _lblStats.ForeColor = textColor;
+
+            _chartControl.SetTheme(isDark);
 
             foreach (Control ctrl in _panelInput.Controls)
             {
@@ -472,6 +554,16 @@ namespace FitTracker
             }
 
             foreach (Control ctrl in _panelChart.Controls)
+            {
+                if (ctrl is Label or ComboBox)
+                {
+                    ctrl.BackColor = panelColor;
+                    ctrl.ForeColor = textColor;
+                }
+            }
+
+            // Дополнительно подсветим элементы фильтра (лежит внутри _panelFilter)
+            foreach (Control ctrl in _panelFilter.Controls)
             {
                 if (ctrl is Label or ComboBox)
                 {
@@ -508,10 +600,9 @@ namespace FitTracker
 
         private void UpdateChartWithFilter()
         {
-            _chart.Series[0].Points.Clear();
             string filter = _cmbExerciseFilter.SelectedItem?.ToString() ?? "";
 
-            int index = 1;
+            var data = new List<(string date, int weight)>();
             foreach (var workout in _workouts)
             {
                 foreach (var exercise in workout.Exercises)
@@ -519,11 +610,16 @@ namespace FitTracker
                     if (string.IsNullOrEmpty(filter) || filter == "(Все упражнения)" ||
                         exercise.Name.Equals(filter, StringComparison.OrdinalIgnoreCase))
                     {
-                        _chart.Series[0].Points.AddXY(index, exercise.Weight);
-                        index++;
+                        data.Add((workout.Date, exercise.Weight));
                     }
                 }
             }
+
+            _chartControl.Title = string.IsNullOrEmpty(filter) || filter == "(Все упражнения)"
+                ? "Прогресс веса"
+                : $"Прогресс: {filter}";
+
+            _chartControl.Data = data;
         }
 
         #endregion
