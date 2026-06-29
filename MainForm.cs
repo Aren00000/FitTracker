@@ -9,7 +9,7 @@ namespace FitTracker
     /// Главная форма приложения Fit Tracker
     /// Предоставляет интерфейс для управления тренировками и просмотра аналитики
     /// </summary>
-    public partial class MainForm : Form
+public class MainForm : Form
     {
         private readonly DataService _dataService;
         private readonly AnalysisService _analysisService;
@@ -48,7 +48,20 @@ namespace FitTracker
             _settings = new AppSettings();
 
             InitializeComponent();
-            LoadData();
+            try
+            {
+                LoadData();
+            }
+            catch (Exception ex)
+            {
+                // чтобы приложение не падало на старте при поврежденных/битых файлах данных
+                MessageBox.Show($"❌ Не удалось загрузить данные: {ex.Message}", "Ошибка загрузки данных",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _workouts = new List<Workout>();
+                UpdateDataGridView();
+                UpdateChart();
+                UpdateExerciseFilter();
+            }
             ApplyTheme();
             UpdateLanguage();
         }
